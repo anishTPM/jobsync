@@ -1,5 +1,5 @@
 "use client";
-import { Calendar, MapPin, PlusCircle, StickyNote } from "lucide-react";
+import { Calendar, MapPin, PlusCircle, StickyNote, CheckSquare, Square } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { Badge } from "../ui/badge";
@@ -7,6 +7,12 @@ import { CircularScore } from "@/components/CircularScore";
 import { JobResponse, JobStatus } from "@/models/job.model";
 import { JobStatusBadge } from "./JobStatusBadge";
 import { JobActionsMenu } from "./JobActionsMenu";
+import { DiscoveryStatusBadge } from "./DiscoveryStatusBadge";
+
+type SelectionState = {
+  selectedIds: Set<string>;
+  onToggle: (id: string) => void;
+};
 
 type JobCardProps = {
   job: JobResponse;
@@ -15,6 +21,7 @@ type JobCardProps = {
   onChangeJobStatus: (id: string, status: JobStatus) => void;
   onAddNote: (jobId: string) => void;
   onDeleteJob: (jobId: string) => void;
+  selection?: SelectionState;
 };
 
 export function JobCard({
@@ -24,12 +31,28 @@ export function JobCard({
   onChangeJobStatus,
   onAddNote,
   onDeleteJob,
+  selection,
 }: JobCardProps) {
   const notesCount = job._count?.Notes ?? 0;
+  const isSelected = !!selection && selection.selectedIds.has(job.id);
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
+    <div className={`flex flex-col gap-3 rounded-lg border bg-card p-4 ${isSelected ? "ring-2 ring-primary" : ""}`}>
       <div className="flex items-start gap-3">
+        {selection && (
+          <button
+            type="button"
+            onClick={() => selection.onToggle(job.id)}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded transition-colors hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={isSelected ? "Deselect" : "Select"}
+          >
+            {isSelected ? (
+              <CheckSquare className="h-5 w-5 text-primary" />
+            ) : (
+              <Square className="h-5 w-5 text-muted-foreground" />
+            )}
+          </button>
+        )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           alt="Company logo"
@@ -94,7 +117,10 @@ export function JobCard({
       </div>
 
       <div className="mt-auto flex items-center justify-between border-t pt-3">
-        <JobStatusBadge job={job} />
+        <div className="flex items-center gap-1.5">
+          <JobStatusBadge job={job} />
+          <DiscoveryStatusBadge job={job} />
+        </div>
         <JobActionsMenu
           job={job}
           jobStatuses={jobStatuses}

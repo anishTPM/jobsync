@@ -64,6 +64,8 @@ type JobsListFilters = {
   sourceValue?: string;
 };
 
+const DISCOVERY_STATUS_FILTERS = ["new", "accepted", "dismissed"] as const;
+
 const buildJobsWhereClause = (userId: string, filters: JobsListFilters) => {
   const {
     filter,
@@ -80,7 +82,7 @@ const buildJobsWhereClause = (userId: string, filters: JobsListFilters) => {
       ? {
           jobType: filter,
         }
-      : filter === "accepted" || filter === "dismissed"
+      : DISCOVERY_STATUS_FILTERS.includes(filter as (typeof DISCOVERY_STATUS_FILTERS)[number])
         ? {
             discoveryStatus: filter,
           }

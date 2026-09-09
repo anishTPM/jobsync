@@ -4,6 +4,11 @@ import { JobResponse, JobStatus } from "@/models/job.model";
 import { DeleteAlertDialog } from "../DeleteAlertDialog";
 import { JobCard } from "./JobCard";
 
+type SelectionState = {
+  selectedIds: Set<string>;
+  onToggle: (id: string) => void;
+};
+
 type MyJobsGridProps = {
   jobs: JobResponse[];
   jobStatuses: JobStatus[];
@@ -11,6 +16,7 @@ type MyJobsGridProps = {
   editJob: (id: string) => void;
   onChangeJobStatus: (id: string, status: JobStatus) => void;
   onAddNote: (jobId: string) => void;
+  selection?: SelectionState;
 };
 
 function MyJobsGrid({
@@ -20,6 +26,7 @@ function MyJobsGrid({
   editJob,
   onChangeJobStatus,
   onAddNote,
+  selection,
 }: MyJobsGridProps) {
   const [alertOpen, setAlertOpen] = useState(false);
   const [jobIdToDelete, setJobIdToDelete] = useState("");
@@ -41,6 +48,7 @@ function MyJobsGrid({
             onChangeJobStatus={onChangeJobStatus}
             onAddNote={onAddNote}
             onDeleteJob={onDeleteJob}
+            selection={selection}
           />
         ))}
       </div>

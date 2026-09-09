@@ -10,7 +10,7 @@ export {
 
 export { addJob, updateJob, deleteJobById } from "./job/mutations";
 
-export { updateJobStatus, saveJobMatchResult } from "./job/status";
+export { updateJobStatus, saveJobMatchResult, bulkUpdateJobs } from "./job/status";
 
 export {
   getStatusList,

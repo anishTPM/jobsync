@@ -170,6 +170,7 @@ export function JobsToolbar({
               <SelectItem value="draft">Draft</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
               <SelectItem value="PT">Part-time</SelectItem>
+              <SelectItem value="new">New (discovered)</SelectItem>
               <SelectItem value="accepted">Accepted (discovered)</SelectItem>
               <SelectItem value="dismissed">Dismissed (discovered)</SelectItem>
             </SelectGroup>

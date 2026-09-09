@@ -18,6 +18,14 @@ import { CircularScore } from "@/components/CircularScore";
 import { JobStatusBadgeMenu } from "./JobStatusBadgeMenu";
 import { TooltipProvider } from "../ui/tooltip";
 import { JobActionsMenu } from "./JobActionsMenu";
+import { Checkbox } from "../ui/checkbox";
+import { DiscoveryStatusBadge } from "./DiscoveryStatusBadge";
+
+type SelectionState = {
+  selectedIds: Set<string>;
+  onToggle: (id: string) => void;
+  onSelectAll: () => void;
+};
 
 type MyJobsTableProps = {
   jobs: JobResponse[];
@@ -26,6 +34,7 @@ type MyJobsTableProps = {
   editJob: (id: string) => void;
   onChangeJobStatus: (id: string, status: JobStatus) => void;
   onAddNote: (jobId: string) => void;
+  selection?: SelectionState;
 };
 
 function MyJobsTable({
@@ -35,6 +44,7 @@ function MyJobsTable({
   editJob,
   onChangeJobStatus,
   onAddNote,
+  selection,
 }: MyJobsTableProps) {
   const [alertOpen, setAlertOpen] = useState(false);
   const [jobIdToDelete, setJobIdToDelete] = useState("");
@@ -44,11 +54,28 @@ function MyJobsTable({
     setJobIdToDelete(jobId);
   };
 
+  const isAllSelected =
+    selection &&
+    jobs.length > 0 &&
+    jobs.every((job) => selection.selectedIds.has(job.id));
+  const isSomeSelected =
+    selection && jobs.some((job) => selection.selectedIds.has(job.id));
+
   return (
     <TooltipProvider delayDuration={300}>
       <Table>
         <TableHeader>
           <TableRow>
+            {selection && (
+              <TableHead className="w-12 text-center">
+                <Checkbox
+                  checked={isAllSelected}
+                  indeterminate={isSomeSelected && !isAllSelected}
+                  onChange={selection.onSelectAll}
+                  aria-label="Select all jobs"
+                />
+              </TableHead>
+            )}
             <TableHead className="hidden w-[100px] sm:table-cell">
               <span className="sr-only">Company Logo</span>
             </TableHead>
@@ -66,8 +93,18 @@ function MyJobsTable({
         </TableHeader>
         <TableBody>
           {jobs.map((job: JobResponse) => {
+            const isSelected = selection && selection.selectedIds.has(job.id);
             return (
-              <TableRow key={job.id}>
+              <TableRow key={job.id} className={isSelected ? "bg-primary/5" : ""}>
+                {selection && (
+                  <TableCell className="w-12 text-center">
+                    <Checkbox
+                      checked={isSelected}
+                      onChange={() => selection.onToggle(job.id)}
+                      aria-label={`Select job ${job.JobTitle?.label}`}
+                    />
+                  </TableCell>
+                )}
                 <TableCell className="hidden sm:table-cell">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -105,12 +142,15 @@ function MyJobsTable({
                   <span className="block truncate">{job.Location?.label}</span>
                 </TableCell>
                 <TableCell>
-                  <JobStatusBadgeMenu
-                    job={job}
-                    jobStatuses={jobStatuses}
-                    onChangeJobStatus={onChangeJobStatus}
-                    className="w-[110px] whitespace-nowrap justify-center"
-                  />
+                  <div className="flex items-center justify-center gap-1.5">
+                    <JobStatusBadgeMenu
+                      job={job}
+                      jobStatuses={jobStatuses}
+                      onChangeJobStatus={onChangeJobStatus}
+                      className="w-[110px] whitespace-nowrap justify-center"
+                    />
+                    <DiscoveryStatusBadge job={job} />
+                  </div>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
                   {job.matchScore != null ? (

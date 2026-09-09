@@ -18,6 +18,8 @@ export interface ProviderRegistryEntry {
     description: string;
     sensitive: boolean;
   };
+  requiresBaseUrl?: boolean;
+  baseUrlEnvVar?: string;
 }
 
 export const PROVIDER_REGISTRY: Record<string, ProviderRegistryEntry> = {
@@ -115,9 +117,27 @@ export const PROVIDER_REGISTRY: Record<string, ProviderRegistryEntry> = {
       sensitive: true,
     },
   },
+  "openai-compatible": {
+    id: "openai-compatible",
+    displayName: "OpenAI Compatible",
+    credentialType: "api-key",
+    category: "cloud",
+    envVar: "OPENAI_COMPATIBLE_API_KEY",
+    baseUrlEnvVar: "OPENAI_COMPATIBLE_BASE_URL",
+    requiresBaseUrl: true,
+    parseModelsResponse: (data) => (data.data?.map((m: any) => m.id) ?? []).sort(),
+    requiresRunningCheck: false,
+    supportsKeepAlive: false,
+    keyConfig: {
+      placeholder: "sk-...",
+      inputType: "password",
+      description: "API key for your OpenAI-compatible endpoint",
+      sensitive: true,
+    },
+  },
 };
 
-export const AI_PROVIDERS = ["ollama", "openai", "deepseek", "openrouter", "gemini"] as const;
+export const AI_PROVIDERS = ["ollama", "openai", "deepseek", "openrouter", "gemini", "openai-compatible"] as const;
 export type AiProviderId = (typeof AI_PROVIDERS)[number];
 
 export function getAiProviders(): ProviderRegistryEntry[] {

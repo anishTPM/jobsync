@@ -1,12 +1,14 @@
 "use client";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardFooter } from "../ui/card";
 import { Loader } from "lucide-react";
 import {
   deleteJobById,
   getJobDetails,
   updateJobStatus,
+  bulkUpdateJobs,
 } from "@/actions/job.actions";
+import { acceptDiscoveredJob, dismissDiscoveredJob } from "@/actions/automation.actions";
 import { toastError, toastSuccess } from "@/lib/toast";
 import {
   Company,
@@ -25,6 +27,7 @@ import { useJobFilters } from "./jobs-container/useJobFilters";
 import { useJobsList } from "./jobs-container/useJobsList";
 import { downloadJobsList } from "./jobs-container/downloadJobsCsv";
 import { JobsToolbar } from "./jobs-container/JobsToolbar";
+import { BulkActionsBar } from "./BulkActionsBar";
 
 type MyJobsProps = {
   statuses: JobStatus[];
@@ -33,6 +36,13 @@ type MyJobsProps = {
   locations: JobLocation[];
   sources: JobSource[];
   tags: Tag[];
+};
+
+type SelectionState = {
+  selectedIds: Set<string>;
+  onToggle: (id: string) => void;
+  onSelectAll: () => void;
+  onClear: () => void;
 };
 
 function JobsContainer({
@@ -47,6 +57,8 @@ function JobsContainer({
   const [editJob, setEditJob] = useState(null);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [noteJobId, setNoteJobId] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const {
     queryParams,
@@ -87,6 +99,38 @@ function JobsContainer({
     sourceFilter,
   });
 
+  const onToggleSelection = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const onSelectAll = useCallback(() => {
+    if (selectedIds.size === jobs.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(jobs.map((j) => j.id)));
+    }
+  }, [jobs, selectedIds.size]);
+
+  const onClearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const hasSelection = selectedIds.size > 0;
+  const selectionState: SelectionState = {
+    selectedIds,
+    onToggle: onToggleSelection,
+    onSelectAll,
+    onClear: onClearSelection,
+  };
+
   const onDeleteJob = async (jobId: string) => {
     const { res, success, message } = await deleteJobById(jobId);
     if (success) {
@@ -113,6 +157,52 @@ function JobsContainer({
       toastSuccess(`Job has been updated successfully`);
     } else {
       toastError(message);
+    }
+    reloadJobs();
+  };
+
+  const onBulkStatusChange = async (status: JobStatus) => {
+    if (selectedIds.size === 0) return;
+    setBulkLoading(true);
+    try {
+      const result = await bulkUpdateJobs(
+        Array.from(selectedIds),
+        { kind: "jobStatus", status },
+      );
+      if (result.success) {
+        toastSuccess(`${result.updated} job(s) updated`);
+        onClearSelection();
+        router.refresh();
+      } else {
+        toastError(result.message);
+      }
+    } catch {
+      toastError("Failed to bulk update jobs");
+    } finally {
+      setBulkLoading(false);
+    }
+    reloadJobs();
+  };
+
+  const onBulkDiscoveryStatusChange = async (value: "accepted" | "dismissed") => {
+    if (selectedIds.size === 0) return;
+    setBulkLoading(true);
+    try {
+      const result = await bulkUpdateJobs(
+        Array.from(selectedIds),
+        { kind: "discoveryStatus", value },
+      );
+      if (result.success) {
+        toastSuccess(`${result.updated} job(s) updated`);
+        onClearSelection();
+        router.refresh();
+      } else {
+        toastError(result.message);
+      }
+    } catch {
+      toastError("Failed to bulk update discovery status");
+    } finally {
+      setBulkLoading(false);
     }
     reloadJobs();
   };
@@ -159,6 +249,16 @@ function JobsContainer({
           resetEditJob={resetEditJob}
           addJobInitialOpen={queryParams.get("add-job") === "true"}
         />
+        {hasSelection && (
+          <BulkActionsBar
+            selectedCount={selectedIds.size}
+            jobStatuses={statuses}
+            onStatusChange={onBulkStatusChange}
+            onDiscoveryStatusChange={onBulkDiscoveryStatusChange}
+            onClear={onClearSelection}
+            isLoading={bulkLoading}
+          />
+        )}
         <CardContent>
           {initialLoading && <Loading />}
           {jobs.length > 0 &&
@@ -170,6 +270,7 @@ function JobsContainer({
                 editJob={onEditJob}
                 onChangeJobStatus={onChangeJobStatus}
                 onAddNote={onAddNote}
+                selection={selectionState}
               />
             ) : (
               <MyJobsTable
@@ -179,6 +280,7 @@ function JobsContainer({
                 editJob={onEditJob}
                 onChangeJobStatus={onChangeJobStatus}
                 onAddNote={onAddNote}
+                selection={selectionState}
               />
             ))}
           {jobs.length < totalJobs && (
