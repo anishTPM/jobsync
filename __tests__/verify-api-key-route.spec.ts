@@ -58,7 +58,7 @@ describe("POST /api/settings/api-keys/verify", () => {
 
     expect(res.status).toBe(200);
     expect(data).toEqual({ success: true, models: ["gpt-4o"] });
-    expect(mockVerifier).toHaveBeenCalledWith("sk-live");
+    expect(mockVerifier).toHaveBeenCalledWith("sk-live", undefined);
   });
 
   it("maps connection failures to a friendly message", async () => {

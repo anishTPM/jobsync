@@ -117,6 +117,44 @@ export const updateAiSettings = async (
   return updateUserSettings({ ai: aiSettings });
 };
 
+export const updateOpenAiCompatibleBaseUrl = async (
+  baseUrl: string | null,
+): Promise<any | undefined> => {
+  try {
+    const user = await requireUser();
+    const existing = await prisma.userSettings.findUnique({ where: { userId: user.id } });
+    let merged: UserSettingsData;
+    if (existing) {
+      const current: UserSettingsData = JSON.parse(existing.settings);
+      const nextAi = { ...defaultUserSettings.ai, ...current.ai } as AiSettings;
+      if (baseUrl) {
+        nextAi.openaiCompatibleBaseUrl = baseUrl;
+      } else {
+        delete (nextAi as unknown as Record<string, unknown>).openaiCompatibleBaseUrl;
+      }
+      merged = {
+        ...defaultUserSettings,
+        ...current,
+        ai: nextAi,
+        display: { ...defaultUserSettings.display, ...current.display },
+      };
+    } else {
+      const nextAi: AiSettings = { ...defaultUserSettings.ai } as AiSettings;
+      if (baseUrl) nextAi.openaiCompatibleBaseUrl = baseUrl;
+      merged = { ...defaultUserSettings, ai: nextAi, display: { ...defaultUserSettings.display } };
+    }
+    const saved = await prisma.userSettings.upsert({
+      where: { userId: user.id },
+      update: { settings: JSON.stringify(merged) },
+      create: { userId: user.id, settings: JSON.stringify(merged) },
+    });
+    return { success: true, data: { userId: user.id, settings: JSON.parse(saved.settings) } };
+  } catch (error) {
+    const msg = "Failed to update OpenAI Compatible base URL.";
+    return handleError(error, msg);
+  }
+};
+
 export const updateDisplaySettings = async (
   displaySettings: DisplaySettings
 ): Promise<any | undefined> => {

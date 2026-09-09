@@ -81,6 +81,8 @@ function AiSettings() {
         return Object.values(DeepseekModel);
       case AiProvider.GEMINI:
         return Object.values(GeminiModel);
+      case AiProvider.OPENAI_COMPATIBLE:
+        return [];
       default:
         return [];
     }
@@ -90,6 +92,41 @@ function AiSettings() {
     (provider: AiProvider) => {
       const entry = PROVIDER_REGISTRY[provider];
       if (!entry) return () => {};
+
+      // OpenAI Compatible has no static endpoint — models are listed from the stored base URL via a proxy route.
+      if (provider === AiProvider.OPENAI_COMPATIBLE) {
+        let cancelled = false;
+        setIsLoadingModels(true);
+        setFetchError("");
+        setConnectionError("");
+        (async () => {
+          try {
+            const response = await fetch("/api/ai/openai-compatible/models");
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => null);
+              const errorMsg =
+                errorData?.error || "Failed to fetch models. Set the Base URL and API Key in API Keys first.";
+              if (!cancelled) {
+                setFetchedModels([]);
+                setConnectionError(errorMsg);
+              }
+              return;
+            }
+            const data = await response.json();
+            const models = entry.parseModelsResponse?.(data) ?? [];
+            if (!cancelled) setFetchedModels(models);
+          } catch (error) {
+            console.error(`Error fetching ${entry.displayName} models:`, error);
+            if (!cancelled) {
+              setFetchedModels([]);
+              setConnectionError("Failed to fetch models. Set the Base URL and API Key in API Keys first.");
+            }
+          } finally {
+            if (!cancelled) setIsLoadingModels(false);
+          }
+        })();
+        return () => { cancelled = true; };
+      }
 
       if (!entry.modelsEndpoint) {
         const fallbackModels = getFallbackModels(provider);
@@ -228,8 +265,8 @@ function AiSettings() {
           AI Service Provider
         </Label>
         <Select
-          value={selectedModel.provider}
-          onValueChange={setSelectedProvider}
+          value={selectedModel.provider as string}
+          onValueChange={(v) => setSelectedProvider(v as AiProvider)}
         >
           <SelectTrigger
             id="ai-provider"

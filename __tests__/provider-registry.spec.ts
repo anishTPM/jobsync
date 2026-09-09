@@ -6,7 +6,7 @@ describe("AI_PROVIDERS", () => {
   });
 
   it("contains exactly 5 providers", () => {
-    expect(AI_PROVIDERS).toHaveLength(5);
+    expect(AI_PROVIDERS).toHaveLength(6);
   });
 
   it("contains ollama, openai, deepseek, openrouter, gemini", () => {
@@ -17,6 +17,7 @@ describe("AI_PROVIDERS", () => {
         "deepseek",
         "openrouter",
         "gemini",
+        "openai-compatible",
       ]),
     );
   });
