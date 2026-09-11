@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -17,6 +17,7 @@ import { useJobsInfiniteScroll } from "./discovered-jobs-list/useJobsInfiniteScr
 import { DiscoveredJobsHeader } from "./discovered-jobs-list/DiscoveredJobsHeader";
 import { DiscoveredJobRow } from "./discovered-jobs-list/DiscoveredJobRow";
 import { ClearJobsDialog } from "./discovered-jobs-list/ClearJobsDialog";
+import { getUnanalyzedDiscoveredJobIds } from "@/actions/automation.actions";
 
 interface DiscoveredJobsListProps {
   jobs: DiscoveredJob[];
@@ -61,8 +62,16 @@ export function DiscoveredJobsList({
   const [clearOpen, setClearOpen] = useState(false);
   const [clearIncludeNew, setClearIncludeNew] = useState(false);
 
-  const { loadingAction, handleAnalyze, handleAccept, handleDismiss } =
-    useDiscoveredJobActions(onRefresh, onBusyChange);
+  const {
+    loadingAction,
+    bulkAnalyzing,
+    bulkProgress,
+    handleAnalyze,
+    handleAnalyzeAll: runBulkAnalyzeIds,
+    cancelBulkAnalyze,
+    handleAccept,
+    handleDismiss,
+  } = useDiscoveredJobActions(onRefresh, onBusyChange);
 
   const sentinelRef = useJobsInfiniteScroll(
     jobs.length,
@@ -81,6 +90,74 @@ export function DiscoveredJobsList({
       return b.matchScore - a.matchScore;
     });
   }, [jobs]);
+
+  // Pending count for the header must reflect the whole automation, not just
+  // the currently filtered page. The filtered `jobs` array would hide the 42
+  // un-analyzed dismissed jobs when the default filter is new+accepted, making
+  // Analyze All appear missing. Track the authoritative total separately.
+  // Fallback only, used if the authoritative server fetch fails: scope to
+  // "new" here too so a bulk run never touches accepted/dismissed jobs.
+  const filteredPendingIds = useMemo(
+    () =>
+      jobs
+        .filter((j) => j.discoveryStatus === "new" && !isAnalyzed(j))
+        .map((j) => j.id),
+    [jobs],
+  );
+  const [totalPendingCount, setTotalPendingCount] = useState<number | null>(null);
+  // True while the authoritative id fetch is in flight, before the bulk hook
+  // flips bulkAnalyzing. Guards against a second click starting a concurrent
+  // run over the same jobs during that round trip.
+  const [preparingAnalyze, setPreparingAnalyze] = useState(false);
+  const pendingAnalyzeCount = totalPendingCount ?? filteredPendingIds.length;
+
+  const refreshTotalPending = useCallback(async () => {
+    try {
+      const res = await getUnanalyzedDiscoveredJobIds(automationId);
+      if (res.success && res.ids) setTotalPendingCount(res.ids.length);
+    } catch {
+      // keep fallback
+    }
+  }, [automationId]);
+
+  useEffect(() => {
+    refreshTotalPending();
+  }, [refreshTotalPending, jobs.length, totalJobs]);
+
+  const handleAnalyzeAllClick = useCallback(async () => {
+    if (preparingAnalyze || bulkAnalyzing) return;
+    setPreparingAnalyze(true);
+    try {
+      // Always fetch the authoritative set so we cover pages not yet loaded via
+      // infinite scroll and the current status filter (default excludes dismissed).
+      let ids: string[] | null = null;
+      try {
+        const res = await getUnanalyzedDiscoveredJobIds(automationId);
+        if (res.success && res.ids) ids = res.ids;
+      } catch {
+        // fallback below
+      }
+      if (!ids) ids = filteredPendingIds;
+      if (ids.length === 0) {
+        // no pending in current filter but maybe stale header — re-check total
+        await refreshTotalPending();
+        return;
+      }
+      await runBulkAnalyzeIds(ids);
+      // keep header count in sync after the sequential run (bulk hook already
+      // called onRefresh, but total fetch is separate)
+      await refreshTotalPending();
+    } finally {
+      setPreparingAnalyze(false);
+    }
+  }, [
+    preparingAnalyze,
+    bulkAnalyzing,
+    automationId,
+    filteredPendingIds,
+    runBulkAnalyzeIds,
+    refreshTotalPending,
+  ]);
 
   const hasAnyJobs = dismissedCount + newCount + acceptedCount > 0;
 
@@ -110,6 +187,13 @@ export function DiscoveredJobsList({
         }}
         statusFilter={statusFilter}
         onStatusFilterChange={onStatusFilterChange}
+        pendingAnalyzeCount={pendingAnalyzeCount}
+        bulkAnalyzing={bulkAnalyzing}
+        preparingAnalyze={preparingAnalyze}
+        bulkProgress={bulkProgress}
+        onAnalyzeAll={handleAnalyzeAllClick}
+        onCancelAnalyzeAll={cancelBulkAnalyze}
+        runInProgress={!!runInProgress}
       />
       <CardContent>
         {jobs.length === 0 ? (
@@ -140,8 +224,13 @@ export function DiscoveredJobsList({
                   <DiscoveredJobRow
                     key={job.id}
                     job={job}
-                    isLoading={loadingAction === job.id}
-                    runInProgress={runInProgress}
+                    isLoading={
+                      loadingAction === job.id ||
+                      bulkProgress?.currentId === job.id
+                    }
+                    runInProgress={
+                      !!runInProgress || bulkAnalyzing || preparingAnalyze
+                    }
                     onViewDetails={onViewDetails}
                     onAnalyze={handleAnalyze}
                     onAccept={handleAccept}

@@ -22,4 +22,6 @@ export {
 
 export { analyzeDiscoveredJob } from "./automation/analyze";
 
+export { getUnanalyzedDiscoveredJobIds } from "./automation/bulkAnalyze";
+
 export { getAutomationRuns, deleteAutomationRun } from "./automation/runs";

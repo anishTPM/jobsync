@@ -98,6 +98,11 @@ export const APP_CONSTANTS = {
   // Ollama runs sequentially since it serializes on the GPU).
   AUTOMATION_MATCH_CONCURRENCY: 3,
 
+  // Delay between sequential bulk-analyze calls from the automation detail
+  // Discovered Jobs list. One at a time keeps load predictable for hosted
+  // providers and avoids GPU contention on local Ollama.
+  AUTOMATION_BULK_ANALYZE_DELAY_MS: 1200,
+
   // Shared ATS tuning (applies to every job board provider)
   ATS_MAX_COMPANIES: 25, // per automation
   ATS_LISTING_CAP: 50, // safety ceiling applied after the relevance floor

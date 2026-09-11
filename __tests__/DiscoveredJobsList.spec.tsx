@@ -8,6 +8,10 @@ vi.mock("@/actions/automation.actions", () => ({
   dismissDiscoveredJob: vi.fn(),
   analyzeDiscoveredJob: vi.fn(),
   clearDiscoveredJobs: vi.fn(),
+  getUnanalyzedDiscoveredJobIds: vi.fn().mockResolvedValue({
+    success: true,
+    ids: [],
+  }),
 }));
 
 let intersectionCallback: IntersectionObserverCallback;
